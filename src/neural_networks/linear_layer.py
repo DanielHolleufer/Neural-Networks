@@ -1,56 +1,59 @@
 import numpy as np
 import numpy.typing as npt
-from typing import cast, Protocol
+from typing import Protocol
 
 
-class WeightInitializer[F: np.floating = np.float64](Protocol):
-    def __call__(
-        self,
-        input_dim: int,
-        output_dim: int,
-        seed: int | None = None,
-        dtype: type[F] = np.float64,
-    ) -> npt.NDArray[F]: ...
+class WeightInitializer(Protocol):
+    def __call__(self, input_dim: int, output_dim: int, dtype) -> npt.NDArray: ...
 
 
-class Linear[F: np.floating = np.float64]:
+class Linear:
     def __init__(
         self,
         input_dim: int,
         output_dim: int,
-        weight_initializer: WeightInitializer[F],
-        seed: int | None = None,
-        dtype: type[F] = np.float64,
+        weight_initializer: WeightInitializer,
+        dtype: npt.DTypeLike = np.float64,
     ) -> None:
-        self.weights: npt.NDArray[F] = weight_initializer(
-            input_dim, output_dim, seed=seed, dtype=dtype
-        )
-        self.biases: npt.NDArray[F] = np.zeros(output_dim, dtype=dtype)
-        self.input: npt.NDArray[F] | None = None
-        self.weight_derivatives: npt.NDArray[F] | None = None
-        self.bias_derivatives: npt.NDArray[F] | None = None
+        self.weights = weight_initializer(input_dim, output_dim, dtype)
+        self.biases = np.zeros(output_dim, dtype=dtype)
+        self.input = None
+        self.weight_derivatives = None
+        self.bias_derivatives = None
 
-    def forward(self, input: npt.NDArray[F]) -> npt.NDArray[F]:
-        return cast(npt.NDArray[F], input @ self.weights + self.biases)
+    def forward(self, input: npt.NDArray) -> npt.NDArray:
+        return input @ self.weights + self.biases
 
 
-def uniform_glorot[F: np.floating = np.float64](
-    input_dim: int,
-    output_dim: int,
-    seed: int | None = None,
-    dtype: type[F] = np.float64,
-) -> npt.NDArray[F]:
-    rng = np.random.default_rng(seed)
-    limit = np.sqrt(6 / (input_dim + output_dim))
-    return rng.uniform(-limit, limit, (input_dim, output_dim)).astype(dtype)
+class FromMatrix:
+    def __init__(self, weights: npt.NDArray) -> None:
+        self.weights = weights
+
+    def __call__(self, input_dim: int, output_dim: int, dtype: npt.DTypeLike) -> npt.NDArray:
+        if not self.weights.shape == (input_dim, output_dim):
+            raise ValueError(
+                f"FromMatrix: "
+                f"Weights matrix shape does not match layer input_dim and output_dim. "
+                f"Weights matrix shape: {self.weights.shape} "
+                f"Layer (input_dim, output_dim): ({input_dim}, {output_dim})."
+            )
+
+        return self.weights.astype(dtype, copy=True)
 
 
-def uniform_he[F: np.floating = np.float64](
-    input_dim: int,
-    output_dim: int,
-    seed: int | None = None,
-    dtype: type[F] = np.float64,
-) -> npt.NDArray[F]:
-    rng = np.random.default_rng(seed)
-    limit = np.sqrt(6 / input_dim)
-    return rng.uniform(-limit, limit, (input_dim, output_dim)).astype(dtype)
+class UniformGlorot:
+    def __init__(self, seed: int | None = None) -> None:
+        self.rng = np.random.default_rng(seed)
+
+    def __call__(self, input_dim: int, output_dim: int, dtype: npt.DTypeLike) -> npt.NDArray:
+        limit = np.sqrt(6 / (input_dim + output_dim))
+        return self.rng.uniform(-limit, limit, (input_dim, output_dim)).astype(dtype)
+
+
+class UniformHe:
+    def __init__(self, seed: int | None = None) -> None:
+        self.rng = np.random.default_rng(seed)
+
+    def __call__(self, input_dim: int, output_dim: int, dtype: npt.DTypeLike) -> npt.NDArray:
+        limit = np.sqrt(6 / input_dim)
+        return self.rng.uniform(-limit, limit, (input_dim, output_dim)).astype(dtype)
