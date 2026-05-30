@@ -4,7 +4,7 @@ from typing import Protocol
 
 
 class WeightInitializer(Protocol):
-    def __call__(self, input_dim: int, output_dim: int, dtype) -> npt.NDArray: ...
+    def __call__(self, input_dim: int, output_dim: int, dtype: npt.DTypeLike) -> npt.NDArray: ...
 
 
 class Linear:
